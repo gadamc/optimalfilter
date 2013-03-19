@@ -261,10 +261,10 @@ class HeatSignal(Signal):
 
     Read this module's docstring. 
 
-    Note that by default, the time_per_index for Heat pulses is 
-    2.016 ms. That means that the parameters (0, 2, 3, 5)
-    used in the '_val' method should also be in units of 'ms'. The 
-    length of the pulse, by default, is 512 points.
+    Note that by default, the time_per_index for Heat pulses is 1.0. 
+    That means that the parameters (0, 2, 3, 5)
+    used in the '_val' method should also be in units of 'sample size'. 
+    The length of the pulse, by default, is 512 points.
 
 
     Here is the code that generates the signal
@@ -279,10 +279,10 @@ class HeatSignal(Signal):
 
   '''
 
-  def __init__(self, length = 512, time_per_index = 2.016, parameters = None):
+  def __init__(self, length = 512, time_per_index = 1.0, parameters = None):
 
     if parameters is None:
-      Signal.__init__(self, length, time_per_index, [514.08,-1,21.04,16.34,0.1331,129.54]) #these are actually the parameters for chalA FID802 for 2011-11-23
+      Signal.__init__(self, length, time_per_index, [514.08/2.016,-1,21.04/2.016,16.34/2.016,0.1331,129.54/2.016]) #these are actually the parameters for chalA FID802 for 2011-11-23
     else:
       Signal.__init__(self, length, time_per_index)
 
@@ -303,7 +303,7 @@ class HeatSignal(Signal):
 
     Signal._val(self, time)
 
-    if time < self._parameters[0]: 
+    if time <= self._parameters[0]: 
       return 0  
 
     pt = time-self._parameters[0]  #pt = post trigger
@@ -350,7 +350,7 @@ class BBv2IonSignal(Signal):
     '''
     Signal._val(self, time)
 
-    if time < self._parameters[0]: 
+    if time <= self._parameters[0]: 
       return 0  
     
     return self._parameters[1]
