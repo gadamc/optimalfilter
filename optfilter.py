@@ -19,17 +19,25 @@ class tukeyWindow(object):
 
 class optimalFilter(object):
   '''
-    to use this class you must give it a window function. for example
+    to use this class you must give it a window function, a noise power spectrum,
+    a template pulse and instruct your instance to calculate the optimal 
+    filter kernel. 
+
+    for example:
+    
     myOptFil = optimalFilter()
     myOptFil.window = tukeyWindow(512, 0.3).window
-
-    also, you must give it the noise power
     myOptFil.noisepower = anoisepower  #anoisepower is a numpy array
+    myOptFil.setTemplate( aTemplate )
+    myOptFil.calcKernel()
 
-    after you call setTemplate, you should call calcKernel just once before you 
-    can use the class to estimate amplitudes of singals with the calcAmp method.
+    #for each pulse,
 
-    setTemplate and calcAmp take numpy arrays as inputs
+    myOptFil.calcAmp(aPulse)
+
+    ampEstimator = myOptFil.amp_estimator
+
+    all arrays in this class should be numpy arrays.
 
   '''
 
@@ -54,6 +62,7 @@ class optimalFilter(object):
     self.templatefft = numpy.fft.rfft(tempPulseWindow)
 
 
+
   def calcKernel(self):
     self.N = (2* (len(self.templatefft) - 1))
     
@@ -73,14 +82,36 @@ class optimalFilter(object):
 
     self.amp_estimator_integrand = self.kernel*self.inputfft
 
-    #!!! why doesn't the inverse fourier transform produce the correct results!
-    self.amp_estimator = numpy.fft.irfft(self.amp_estimator_integrand)/numpy.sqrt(math.pi)
+    #inverse fourier transform
+    self.amp_estimator = numpy.fft.irfft(self.amp_estimator_integrand)
+    
+    #...or explicit ingegral calculation.
 
-    # instead, the integration over the real parts does work. 
-    self.amp_estimator2 = numpy.zeros(self.N)
-    for time in range(self.N):
-      for freq_k in range(len(self.inputfft)):
-        self.amp_estimator2[time] += self.amp_estimator_integrand[freq_k].real * cmath.exp(1j*self._phase(freq_k, time)).real / self.N
+    # self.amp_estimator = numpy.empty(self.N)
+    # for time in range(self.N):
+    #   self.amp_estimator[time] = -self.amp_estimator_integrand[0].real
+    #   for freq_k in range(len(self.inputfft)):
+    #     g = self.amp_estimator_integrand[freq_k] * cmath.exp(1j*self._phase(freq_k, time))
+    #     self.amp_estimator[time] += (g.conjugate() + g).real
+    # self.amp_estimator /= self.N
+
+    # self.amp_estimator = numpy.empty(self.N)
+    # print -1*len(self.inputfft)+1
+    # for time in range(self.N):
+    #   g = 0
+    #   for freq_k in range(-1*len(self.inputfft)+1, len(self.inputfft)):
+    #     if freq_k > 0:
+    #       g += self.amp_estimator_integrand[freq_k] * cmath.exp(1j*self._phase(freq_k, time))
+    #     else: 
+    #       g += self.amp_estimator_integrand[numpy.abs(freq_k)].conjugate() * cmath.exp(1j*self._phase(freq_k, time)) 
+    #   self.amp_estimator[time] = g.real
+    # self.amp_estimator /= self.N
+
+
+    #both, inverse fourier transform and the explicit integral calculation seem to give the same answer
+    #I also observe the same answer in the C++/KData optimal filter.
+
+    #HOWEVER - the amplitude estimation seems to be off by about ~sqrt(pi)????!!! and i can't figure out why. 
 
   def _phase(self, k, time):
     '''
@@ -94,33 +125,33 @@ class optimalFilter(object):
     #this is the numerator in the chi^2 integral
     diff = self.inputfft[freq_k] - float(amp)*cmath.exp(-1j*self._phase(freq_k, index))*self.templatefft[freq_k]
     
-    return numpy.abs(diff)**2/self.noisepower[freq_k]/self.N
+    return 2.0*numpy.abs(diff)**2/self.noisepower[freq_k]/self.N
 
-  # for testing, this was the explicitly written chi2 function
-  # def _chi2Elementb(self, amp, index, freq_k, debug = False):
+    # # for testing, this was the explicitly written chi2 function
+    # def _chi2Element(self, amp, index, freq_k, debug = False):
 
-  #   sigre = float(self.inputfft[freq_k].real)
-  #   sigim = float(self.inputfft[freq_k].imag)
+    #   sigre = float(self.inputfft[freq_k].real)
+    #   sigim = float(self.inputfft[freq_k].imag)
 
-  #   tempre = float(self.templatefft[freq_k].real)
-  #   tempim = float(self.templatefft[freq_k].imag)
-    
-  #   sig2 = sigre*sigre + sigim*sigim
-  #   temp2 = tempre*tempre + tempim*tempim
-  #   phase = self._phase(freq_k, index)
+    #   tempre = float(self.templatefft[freq_k].real)
+    #   tempim = float(self.templatefft[freq_k].imag)
+      
+    #   sig2 = sigre*sigre + sigim*sigim
+    #   temp2 = tempre*tempre + tempim*tempim
+    #   phase = self._phase(freq_k, index)
 
-  #   chi2 = (sig2 + float(amp) * float(amp) * temp2) / self.noisepower[freq_k] 
-  #   chi2 -= 2.0 * amp * (sigre*tempre + sigim*tempim)*math.cos( phase ) / self.noisepower[freq_k] 
-  #   chi2 += 2.0 * amp * (tempim*sigre - sigim*tempre)*math.sin( phase ) / self.noisepower[freq_k] 
+    #   chi2 = (sig2 + float(amp) * float(amp) * temp2) / self.noisepower[freq_k] 
+    #   chi2 -= 2.0 * amp * (sigre*tempre + sigim*tempim)*math.cos( phase ) / self.noisepower[freq_k] 
+    #   chi2 -= 2.0 * amp * (tempim*sigre - sigim*tempre)*math.sin( phase ) / self.noisepower[freq_k] 
 
-  #   if debug:
-  #     print 'amp, index, freq_k, sig_re, sig_im, temp_re, temp_im, sig**2, temp**2, phase, cos(phase), sin(phase), noisepower[k]'
-  #     print amp, index, freq_k, sigre, sigim, tempre, tempim, sig2, temp2, phase, math.cos(phase), math.sin(phase), self.noisepower[freq_k]
-  #     print 'chi2 line 1', (sig2 + float(amp) * float(amp) * temp2) / self.noisepower[freq_k] 
-  #     print 'chi2 line 2', -2.0 * amp * (sigre*tempre + sigim*tempim)*math.cos( phase ) / self.noisepower[freq_k] 
-  #     print 'chi2 line 3', 2.0 * amp * (tempim*sigre - sigim*tempre)*math.sin( phase ) / self.noisepower[freq_k] 
+    #   if debug:
+    #     print 'amp, index, freq_k, sig_re, sig_im, temp_re, temp_im, sig**2, temp**2, phase, cos(phase), sin(phase), noisepower[k]'
+    #     print amp, index, freq_k, sigre, sigim, tempre, tempim, sig2, temp2, phase, math.cos(phase), math.sin(phase), self.noisepower[freq_k]
+    #     print 'chi2 line 1', (sig2 + float(amp) * float(amp) * temp2) / self.noisepower[freq_k] 
+    #     print 'chi2 line 2', -2.0 * amp * (sigre*tempre + sigim*tempim)*math.cos( phase ) / self.noisepower[freq_k] 
+    #     print 'chi2 line 3', -2.0 * amp * (tempim*sigre - sigim*tempre)*math.sin( phase ) / self.noisepower[freq_k] 
 
-  #   return chi2
+    #   return chi2
 
   def _chi2(self, amp, index):
     '''
@@ -131,26 +162,23 @@ class optimalFilter(object):
 
     return chi2.sum()/self.N
 
-  def chi2_time(self, amp = None, chi2func = None):  
-    if chi2func is None:
-      chi2func = self._chi2
+  def chi2_time(self, amp = None, ):  
+
     if amp is None:
       amp = self.amp_estimator.max()
       if amp < numpy.abs(self.amp_estimator.min()):
         amp = self.amp_estimator.min()
 
-    return numpy.array( [ chi2func(i, amp) for i in range(self.N)] )
+    return numpy.array( [ self._chi2(i, amp) for i in range(self.N)] )
 
-  def chi2_amp(self, time = None, chi2func = None, ampMin = -1000, ampMax = 1000 numSteps = 2000):
+  def chi2_amp(self, time = None,  ampMin = -1000, ampMax = 1000, stepSize = 1):
     
-    if chi2func is None:
-      chi2func = self._chi2
     if time is None:
       time = numpy.abs(self.amp_estimator).argmax()
     
-    stepSize = ampMax - ampMin/numSteps
+    numSteps = (ampMax - ampMin)/stepSize 
    
-    return numpy.array([ chi2func(time, ampMin + i * stepSize) for i in range(numSteps) ])
+    return numpy.array([ self._chi2(time, ampMin + i * stepSize) for i in range(numSteps) ])
 
 
   def variance(self):

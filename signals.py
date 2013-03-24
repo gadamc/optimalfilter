@@ -331,7 +331,7 @@ class BBv2IonSignal(Signal):
     
 
     if parameters is None:
-      Signal.__init__(self, length, [4095.0, 1.0])
+      Signal.__init__(self, length, [4095.0, -1.0])
     else:
       Signal.__init__(self, length)
 
