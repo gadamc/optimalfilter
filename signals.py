@@ -282,7 +282,7 @@ class HeatSignal(Signal):
     if parameters is None:
       Signal.__init__(self, length,  [514.08/2.016,-1,21.04/2.016,16.34/2.016,0.1331,129.54/2.016]) #these are actually the parameters for chalA FID802 for 2011-11-23
     else:
-      Signal.__init__(self, length)
+      Signal.__init__(self, length, parameters)
 
 
     

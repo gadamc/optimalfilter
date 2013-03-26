@@ -29,7 +29,7 @@ class optimalFilter(object):
     myOptFil.window = tukeyWindow(512, 0.3).window
     myOptFil.noisepower = anoisepower  #anoisepower is a numpy array
     myOptFil.setTemplate( aTemplate )
-    myOptFil.calcKernel()
+    myOptFil.calcKernel() #you should call calcKernel if you ever change the template or the noise_power
 
     #for each pulse,
 
@@ -61,13 +61,14 @@ class optimalFilter(object):
     
     self.templatefft = numpy.fft.rfft(tempPulseWindow)
 
+    self.N = len(templatePulse)
+    self.templatePower = numpy.abs(self.templatefft)**2 / float(self.N)
 
 
   def calcKernel(self):
-    self.N = (2* (len(self.templatefft) - 1))
     
-    self.templatePower = numpy.abs(self.templatefft)**2 / float(self.N)
     denom_intergrand = self.templatePower / self.noisepower
+
     self.denom = denom_intergrand.sum()
 
     self.kernel = (self.templatefft.conjugate()/self.noisepower) / self.denom
@@ -125,35 +126,35 @@ class optimalFilter(object):
     #this is the numerator in the chi^2 integral
     diff = self.inputfft[freq_k] - float(amp)*cmath.exp(-1j*self._phase(freq_k, index))*self.templatefft[freq_k]
     
-    return 2.0*numpy.abs(diff)**2/self.noisepower[freq_k]/self.N
+    return 2.0*numpy.abs(diff)**2/self.noisepower[freq_k]
 
-    # # for testing, this was the explicitly written chi2 function
-    # def _chi2Element(self, amp, index, freq_k, debug = False):
+  # # for testing, this was the explicitly written chi2 function
+  # def _chi2Element(self, amp, index, freq_k, debug = False):
 
-    #   sigre = float(self.inputfft[freq_k].real)
-    #   sigim = float(self.inputfft[freq_k].imag)
+  #   sigre = float(self.inputfft[freq_k].real)
+  #   sigim = float(self.inputfft[freq_k].imag)
 
-    #   tempre = float(self.templatefft[freq_k].real)
-    #   tempim = float(self.templatefft[freq_k].imag)
-      
-    #   sig2 = sigre*sigre + sigim*sigim
-    #   temp2 = tempre*tempre + tempim*tempim
-    #   phase = self._phase(freq_k, index)
+  #   tempre = float(self.templatefft[freq_k].real)
+  #   tempim = float(self.templatefft[freq_k].imag)
+    
+  #   sig2 = sigre*sigre + sigim*sigim
+  #   temp2 = tempre*tempre + tempim*tempim
+  #   phase = self._phase(freq_k, index)
 
-    #   chi2 = (sig2 + float(amp) * float(amp) * temp2) / self.noisepower[freq_k] 
-    #   chi2 -= 2.0 * amp * (sigre*tempre + sigim*tempim)*math.cos( phase ) / self.noisepower[freq_k] 
-    #   chi2 -= 2.0 * amp * (tempim*sigre - sigim*tempre)*math.sin( phase ) / self.noisepower[freq_k] 
+  #   chi2 = (sig2 + float(amp) * float(amp) * temp2) / self.noisepower[freq_k] 
+  #   chi2 -= 2.0 * amp * (sigre*tempre + sigim*tempim)*math.cos( phase ) / self.noisepower[freq_k] 
+  #   chi2 -= 2.0 * amp * (tempim*sigre - sigim*tempre)*math.sin( phase ) / self.noisepower[freq_k] 
 
-    #   if debug:
-    #     print 'amp, index, freq_k, sig_re, sig_im, temp_re, temp_im, sig**2, temp**2, phase, cos(phase), sin(phase), noisepower[k]'
-    #     print amp, index, freq_k, sigre, sigim, tempre, tempim, sig2, temp2, phase, math.cos(phase), math.sin(phase), self.noisepower[freq_k]
-    #     print 'chi2 line 1', (sig2 + float(amp) * float(amp) * temp2) / self.noisepower[freq_k] 
-    #     print 'chi2 line 2', -2.0 * amp * (sigre*tempre + sigim*tempim)*math.cos( phase ) / self.noisepower[freq_k] 
-    #     print 'chi2 line 3', -2.0 * amp * (tempim*sigre - sigim*tempre)*math.sin( phase ) / self.noisepower[freq_k] 
+  #   if debug:
+  #     print 'amp, index, freq_k, sig_re, sig_im, temp_re, temp_im, sig**2, temp**2, phase, cos(phase), sin(phase), noisepower[k]'
+  #     print amp, index, freq_k, sigre, sigim, tempre, tempim, sig2, temp2, phase, math.cos(phase), math.sin(phase), self.noisepower[freq_k]
+  #     print 'chi2 line 1', (sig2 + float(amp) * float(amp) * temp2) / self.noisepower[freq_k] 
+  #     print 'chi2 line 2', -2.0 * amp * (sigre*tempre + sigim*tempim)*math.cos( phase ) / self.noisepower[freq_k] 
+  #     print 'chi2 line 3', -2.0 * amp * (tempim*sigre - sigim*tempre)*math.sin( phase ) / self.noisepower[freq_k] 
 
-    #   return chi2
+  #   return 2.0*chi2
 
-  def _chi2(self, amp, index):
+  def chi2(self, amp, index):
     '''
       calculate chi**2 for a particular pulse amplitude, amp, and at a particular sample point, index.
     '''
@@ -162,24 +163,15 @@ class optimalFilter(object):
 
     return chi2.sum()/self.N
 
-  def chi2_time(self, amp = None, ):  
-
-    if amp is None:
-      amp = self.amp_estimator.max()
-      if amp < numpy.abs(self.amp_estimator.min()):
-        amp = self.amp_estimator.min()
-
-    return numpy.array( [ self._chi2(i, amp) for i in range(self.N)] )
-
-  def chi2_amp(self, time = None,  ampMin = -1000, ampMax = 1000, stepSize = 1):
+  def chi2functor(self, x):
+    '''
+      calculate chi**2 for a particular pulse amplitude, x[0], and at a particular sample point, x[1].
+      This is just a wrapper around the chi2 method which can be used with SciPy's optimize/minimize tools.
+    '''
     
-    if time is None:
-      time = numpy.abs(self.amp_estimator).argmax()
-    
-    numSteps = (ampMax - ampMin)/stepSize 
-   
-    return numpy.array([ self._chi2(time, ampMin + i * stepSize) for i in range(numSteps) ])
+    return self.chi2(x[0], x[1])
 
+  
 
   def variance(self):
-    return self.denom * self.N
+    return 1./(self.denom)

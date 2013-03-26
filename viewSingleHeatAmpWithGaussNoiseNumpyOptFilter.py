@@ -36,8 +36,8 @@ myOptimalFilter.setTemplate(_templatePulse)
 
 myOptimalFilter.calcKernel()
 
-print len(_templatePulse), len(myOptimalFilter.templatefft)
-print len(myOptimalFilter.kernel), len(myOptimalFilter.noisepower), len(myOptimalFilter.templatefft)
+# print len(_templatePulse), len(myOptimalFilter.templatefft)
+# print len(myOptimalFilter.kernel), len(myOptimalFilter.noisepower), len(myOptimalFilter.templatefft)
 
 simpulse = simsignaltype()
 
@@ -83,41 +83,7 @@ while True:
   plt.plot( myOptimalFilter.amp_estimator)
 
 
-  chi2Function = myOptimalFilter._chi2b
-
-  chi2_time = np.zeros(myOptimalFilter.N)
-  for time in range(myOptimalFilter.N):  #loop over time bins
-    chi2_time[time] = chi2Function(time, 300)
-
-  chi2_amp = np.zeros(600)
-  for a_i in range(600):  #loop over amp bins
-    chi2_amp[a_i] = chi2Function(myOptimalFilter.N/2, a_i)  #hack -- fixed time position... works for simulation 
-
-
-  plt.subplot(6,1,5)
-  plt.cla()
-  #chi2 = myOptimalFilter.chi2(myOptimalFilter._chi2b)
-  #chi2 = myOptimalFilter.chi2_amp()
-  #plt.plot(chi2)
-  #chi2b = myOptimalFilter.chi2_amp(chi2func = myOptimalFilter._chi2b)
-  plt.plot(chi2_amp)
-
-  plt.subplot(6,1,6)
-  plt.cla()
-  #chi2 = myOptimalFilter.chi2(myOptimalFilter._chi2b)
-  #chi2 = myOptimalFilter.chi2_time(amp = np.abs(simsignalAmp), chi2func = myOptimalFilter._chi2b)
-  #plt.plot(chi2/len(simsignal))
-  #chi2b = myOptimalFilter.chi2_time(chi2func = myOptimalFilter._chi2b)
-  plt.plot(chi2_time)
   
-
-  print len(myOptimalFilter.amp_estimator), len(myOptimalFilter.amp_estimator_integrand)
-  print myOptimalFilter.N
-  print 'amplitude estimation max', myOptimalFilter.amp_estimator.max(), 'bin', myOptimalFilter.amp_estimator.argmax()
-  print 'expected min chi2', myOptimalFilter._chi2( np.abs(simsignalAmp), len(simsignal)/2)
-  print 'expected min chi2b', myOptimalFilter._chi2b( np.abs(simsignalAmp), len(simsignal)/2)
-  print 'theoretical variance', myOptimalFilter.variance()
-  raw_input()
 
 
 

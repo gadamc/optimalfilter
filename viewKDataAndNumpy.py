@@ -17,7 +17,7 @@ import scipy.optimize
 
 _pulselength = 512
 _tukey_alpha = 0.3
-simsignalAmp = -30
+simsignalAmp = -100
 _pulseStartTime = _pulselength/2.0
 
 #create the noise power data array and give it to the kampsite/filter
